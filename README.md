@@ -5,7 +5,7 @@ Website statis yang hanya menampilkan Apps Script dalam iframe layar penuh. Tida
 ## Struktur
 
 ```text
-public/index.html  Halaman iframe
+index.html         Halaman iframe
 vercel.json        Konfigurasi hosting statis
 ```
 
@@ -15,7 +15,7 @@ Folder lokal `vercel-iframe` adalah checkout Git tersendiri. Isinya berada di ro
 
 1. Import repository `santrimanofficial26-oss/APLIKASI-PKBM-BECC` melalui Add New → Project.
 2. Gunakan Root Directory `.` (root repository), **bukan** `vercel-iframe`.
-3. Framework Preset: **Other**. Build dan Install Command kosong; Output Directory: **public**. Nilai ini sudah ditetapkan di `vercel.json`.
+3. Framework Preset: **Other**. Build dan Install Command kosong; Output Directory: biarkan kosong (root). Nilai ini sudah ditetapkan di `vercel.json`.
 4. Deploy. Jika repository sudah terhubung ke Vercel dengan auto-deployment, push berikutnya dapat memicu deployment otomatis.
 
 Tidak memerlukan npm install, API key, environment variable, atau backend Vercel.
@@ -24,7 +24,7 @@ Tidak memerlukan npm install, API key, environment variable, atau backend Vercel
 
 https://script.google.com/macros/s/AKfycbz9X7hiPktw4eBXtKCygDWm_OKdwDVUxNT3vMySLeX2E9YNNcFmhtPjiWCCmCrGW82nJA/exec
 
-Untuk mengganti deployment tujuan, edit atribut `src` pada `public/index.html`, commit, lalu push.
+Untuk mengganti deployment tujuan, edit atribut `src` pada `index.html`, commit, lalu push.
 
 ## Perilaku
 
