@@ -30,6 +30,7 @@ Untuk mengganti deployment tujuan, edit atribut `src` pada `index.html`, commit,
 
 - Iframe mengisi viewport desktop dan ponsel, tanpa border, margin, atau scrollbar tambahan pada wrapper.
 - Wrapper mendelegasikan izin kamera ke halaman Apps Script melalui atribut iframe `allow="camera *"` dan header `Permissions-Policy: camera=*`.
+- Untuk absensi foto, kamera dijalankan oleh halaman Vercel paling atas. Apps Script meminta kamera dan menerima hasil foto melalui `window.postMessage`, sehingga iframe internal Google tidak lagi menjadi pemilik izin kamera.
 - Reload wrapper langsung meminta halaman Apps Script. Beranda, login, dan perilaku aplikasi di dalamnya tetap ditentukan oleh deployment Apps Script.
 - Wrapper tidak menambahkan loading, tetapi tidak dapat menghilangkan waktu respons jaringan/Google maupun notifikasi yang ditampilkan Google di dalam iframe.
 - Deployment Apps Script harus dapat diakses oleh pengunjung yang dituju dan mengizinkan embedding. Backend proyek saat ini menggunakan `HtmlService.XFrameOptionsMode.ALLOWALL`.

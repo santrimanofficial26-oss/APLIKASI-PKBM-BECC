@@ -24,15 +24,264 @@
       height: 100%;
       border: 0;
     }
+    .camera-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(2, 6, 23, 0.92);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .camera-overlay.active {
+      display: flex;
+    }
+    .camera-dialog {
+      width: min(100%, 560px);
+      overflow: hidden;
+      border-radius: 22px;
+      background: #0f172a;
+      color: #fff;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+    }
+    .camera-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 20px;
+    }
+    .camera-header h2 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+    .camera-close {
+      width: 38px;
+      height: 38px;
+      border: 0;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      font-size: 1.35rem;
+      cursor: pointer;
+    }
+    .camera-stage {
+      position: relative;
+      min-height: 360px;
+      background: #020617;
+    }
+    .camera-stage video,
+    .camera-stage img {
+      display: block;
+      width: 100%;
+      height: min(62vh, 560px);
+      object-fit: cover;
+    }
+    .camera-message {
+      display: flex;
+      min-height: 360px;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+      text-align: center;
+      color: #cbd5e1;
+    }
+    .camera-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      padding: 18px;
+    }
+    .camera-button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 22px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .camera-button.primary {
+      background: #0d9488;
+      color: #fff;
+    }
+    .camera-button.light {
+      background: #fff;
+      color: #0f172a;
+    }
+    .camera-button.outline {
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      background: transparent;
+      color: #fff;
+    }
+    [hidden] {
+      display: none !important;
+    }
   </style>
 </head>
 <body>
   <iframe
+    id="pkbm-app"
     title="Website dan Portal PKBM BECC"
     src="https://script.google.com/macros/s/AKfycbz9X7hiPktw4eBXtKCygDWm_OKdwDVUxNT3vMySLeX2E9YNNcFmhtPjiWCCmCrGW82nJA/exec"
     loading="eager"
     allow="camera *"
     allowfullscreen
   ></iframe>
+  <div class="camera-overlay" id="camera-overlay" role="dialog" aria-modal="true" aria-labelledby="camera-title">
+    <div class="camera-dialog">
+      <div class="camera-header">
+        <h2 id="camera-title">Foto Kehadiran</h2>
+        <button class="camera-close" id="camera-close" type="button" aria-label="Tutup kamera">&times;</button>
+      </div>
+      <div class="camera-stage">
+        <video id="camera-video" autoplay muted playsinline hidden></video>
+        <img id="camera-preview" alt="Pratinjau foto kehadiran" hidden>
+        <div class="camera-message" id="camera-message">Menyiapkan kamera...</div>
+        <canvas id="camera-canvas" hidden></canvas>
+      </div>
+      <div class="camera-actions">
+        <button class="camera-button primary" id="camera-start" type="button">Aktifkan Kamera</button>
+        <button class="camera-button light" id="camera-capture" type="button" hidden>Ambil Foto</button>
+        <button class="camera-button outline" id="camera-retake" type="button" hidden>Foto Ulang</button>
+        <button class="camera-button primary" id="camera-use" type="button" hidden>Gunakan Foto</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      'use strict';
+
+      const trustedGoogleOrigin = /^https:\/\/(?:script\.google\.com|(?:[a-z0-9-]+-)?script\.googleusercontent\.com)$/i;
+      const overlay = document.getElementById('camera-overlay');
+      const video = document.getElementById('camera-video');
+      const preview = document.getElementById('camera-preview');
+      const canvas = document.getElementById('camera-canvas');
+      const message = document.getElementById('camera-message');
+      const startButton = document.getElementById('camera-start');
+      const captureButton = document.getElementById('camera-capture');
+      const retakeButton = document.getElementById('camera-retake');
+      const useButton = document.getElementById('camera-use');
+      const closeButton = document.getElementById('camera-close');
+      let stream = null;
+      let requesterWindow = null;
+      let requesterOrigin = '*';
+      let capturedPhoto = '';
+
+      function stopStream() {
+        if (stream) {
+          stream.getTracks().forEach(function (track) { track.stop(); });
+          stream = null;
+        }
+        video.srcObject = null;
+      }
+
+      function resetCameraUi() {
+        stopStream();
+        capturedPhoto = '';
+        video.hidden = true;
+        preview.hidden = true;
+        preview.removeAttribute('src');
+        message.hidden = false;
+        message.textContent = 'Tekan Aktifkan Kamera untuk memberikan izin kamera pada situs Vercel.';
+        startButton.hidden = false;
+        startButton.disabled = false;
+        startButton.textContent = 'Aktifkan Kamera';
+        captureButton.hidden = true;
+        retakeButton.hidden = true;
+        useButton.hidden = true;
+      }
+
+      function sendToRequester(type, extra) {
+        if (!requesterWindow) return;
+        const payload = Object.assign({ type: type }, extra || {});
+        requesterWindow.postMessage(payload, requesterOrigin);
+      }
+
+      function openCameraBridge(event) {
+        requesterWindow = event.source;
+        requesterOrigin = event.origin;
+        resetCameraUi();
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        setTimeout(startCamera, 0);
+      }
+
+      function closeCameraBridge(cancelled) {
+        stopStream();
+        overlay.classList.remove('active');
+        document.body.style.overflow = 'hidden';
+        if (cancelled) sendToRequester('PKBM_CAMERA_CANCELLED');
+      }
+
+      async function startCamera() {
+        try {
+          if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('Browser tidak mendukung kamera atau halaman belum memakai HTTPS.');
+          }
+          startButton.disabled = true;
+          startButton.textContent = 'Meminta Izin...';
+          message.textContent = 'Izinkan akses kamera ketika browser menampilkan permintaan.';
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 960 } },
+            audio: false
+          });
+          video.srcObject = stream;
+          await video.play();
+          message.hidden = true;
+          video.hidden = false;
+          startButton.hidden = true;
+          captureButton.hidden = false;
+        } catch (error) {
+          stopStream();
+          startButton.disabled = false;
+          startButton.textContent = 'Coba Lagi';
+          message.hidden = false;
+          message.textContent = (error && error.name === 'NotAllowedError')
+            ? 'Izin kamera ditolak. Buka pengaturan situs pada ikon di address bar, izinkan Camera, lalu tekan Coba Lagi.'
+            : (error.message || 'Kamera tidak dapat dibuka.');
+        }
+      }
+
+      function capturePhoto() {
+        if (!video.videoWidth) return;
+        const maxWidth = 720;
+        const scale = Math.min(1, maxWidth / video.videoWidth);
+        canvas.width = Math.round(video.videoWidth * scale);
+        canvas.height = Math.round(video.videoHeight * scale);
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        capturedPhoto = canvas.toDataURL('image/jpeg', 0.82);
+        preview.src = capturedPhoto;
+        stopStream();
+        video.hidden = true;
+        preview.hidden = false;
+        captureButton.hidden = true;
+        retakeButton.hidden = false;
+        useButton.hidden = false;
+      }
+
+      window.addEventListener('message', function (event) {
+        if (!event.data || event.data.type !== 'PKBM_CAMERA_REQUEST') return;
+        if (!trustedGoogleOrigin.test(event.origin)) return;
+        openCameraBridge(event);
+      });
+
+      startButton.addEventListener('click', startCamera);
+      captureButton.addEventListener('click', capturePhoto);
+      retakeButton.addEventListener('click', function () {
+        resetCameraUi();
+        startCamera();
+      });
+      useButton.addEventListener('click', function () {
+        if (!capturedPhoto) return;
+        sendToRequester('PKBM_CAMERA_PHOTO', { dataUrl: capturedPhoto });
+        closeCameraBridge(false);
+      });
+      closeButton.addEventListener('click', function () { closeCameraBridge(true); });
+      window.addEventListener('pagehide', stopStream);
+    })();
+  </script>
 </body>
 </html>
